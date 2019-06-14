@@ -2,8 +2,8 @@ package com.github.reubuisnessgame.gamebank.adminservice.dao;
 
 import com.github.reubuisnessgame.gamebank.adminservice.form.ChangingUserDataForm;
 import com.github.reubuisnessgame.gamebank.adminservice.form.StartGameForm;
-import com.github.reubuisnessgame.gamebank.adminservice.model.BlockScoreModel;
 import com.github.reubuisnessgame.gamebank.adminservice.model.AdminModel;
+import com.github.reubuisnessgame.gamebank.adminservice.model.BlockScoreModel;
 import com.github.reubuisnessgame.gamebank.adminservice.model.TeamModel;
 import com.github.reubuisnessgame.gamebank.adminservice.model.UserModel;
 import com.github.reubuisnessgame.gamebank.adminservice.repository.BlockScoreRepository;
@@ -33,8 +33,10 @@ public class AdminsDAO {
 
     private static final String TEAM_BASE_URL = "127.0.0.1:9993/" + "team" ;
     private static final String SHARES_BASE_URL  = "127.0.0.1:9994/" + "stock";
+    private static final String PROBLEMS_BASE_URL  = "127.0.0.1:9995/" + "problems";
 
     private final BlockScoreRepository blockScoreRepository;
+    private boolean isGameStarted;
 
 
     public AdminsDAO(RepositoryComponent repositoryComponent, TeamsRepository teamsRepository, UserRepository userRepository, BlockScoreRepository blockScoreRepository) {
@@ -42,6 +44,7 @@ public class AdminsDAO {
         this.teamsRepository = teamsRepository;
         this.userRepository = userRepository;
         this.blockScoreRepository = blockScoreRepository;
+        isGameStarted = false;
     }
 
 
@@ -54,6 +57,7 @@ public class AdminsDAO {
     }
 
     public void startGame(String token, boolean isGameStarted) {
+        this.isGameStarted = isGameStarted;
         RestTemplate restTemplate = new RestTemplate();
 
         HttpHeaders headers = new HttpHeaders();
@@ -70,6 +74,12 @@ public class AdminsDAO {
         }
 
         response = restTemplate.postForEntity(SHARES_BASE_URL+"/game", request, Void.class);
+
+        if (response.getStatusCode() != HttpStatus.OK) {
+            throw new HttpServerErrorException(response.getStatusCode());
+        }
+
+        response = restTemplate.postForEntity(PROBLEMS_BASE_URL+"/game", request, Void.class);
 
         if (response.getStatusCode() != HttpStatus.OK) {
             throw new HttpServerErrorException(response.getStatusCode());
@@ -110,53 +120,68 @@ public class AdminsDAO {
         return repositoryComponent.getAdminByToken(token);
     }
 
-    public TeamModel addScore(String token, Long teamNumber, boolean isWin) {
+    public TeamModel addScore(String token, Long teamNumber, boolean isWin) throws IllegalAccessException {
+        if(isGameStarted) {
 
-        AdminModel leading = repositoryComponent.getAdminByToken(token);
-        TeamModel teamModel = repositoryComponent.getTeamByNumber(teamNumber);
-        BlockScoreModel model = blockScoreRepository.findByTeamId(teamModel.getId()).orElseThrow(() -> new IllegalArgumentException("Incorrect team data"));
-        double rate = model.getRate();
-        if (isWin) {
-            rate *= leading.getCoefficient();
-        } else {
-            rate = -leading.getMaxScore();
+            AdminModel leading = repositoryComponent.getAdminByToken(token);
+            TeamModel teamModel = repositoryComponent.getTeamByNumber(teamNumber);
+            BlockScoreModel model = blockScoreRepository.findByTeamId(teamModel.getId()).orElseThrow(() -> new IllegalArgumentException("Incorrect team data"));
+            double rate = model.getRate();
+            if (isWin) {
+                rate *= leading.getCoefficient();
+                teamModel.setScore(teamModel.getScore() + rate);
+            }
+            return teamsRepository.save(teamModel);
         }
-        teamModel.setScore(teamModel.getScore() + rate);
-        return teamsRepository.save(teamModel);
-    }
-
-    public TeamModel blockScore(String token, Double rate, Long teamNumber){
-        AdminModel leading = repositoryComponent.getAdminByToken(token);
-        TeamModel teamModel = repositoryComponent.getTeamByNumber(teamNumber);
-        if (rate > leading.getMaxScore()) {
-            rate = leading.getMaxScore();
-        }
-        teamModel.setScore(teamModel.getScore() - rate);
-        blockScoreRepository.save(new BlockScoreModel(teamModel.getId(), rate));
-        return teamsRepository.save(teamModel);
+        throw new IllegalAccessException("The game has not started yet");
 
     }
 
-    public void clearAll(String token) {
-        repositoryComponent.clearAll();
-
-        RestTemplate restTemplate = new RestTemplate();
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", token);
-
-
-        HttpEntity<Void> request = new HttpEntity<>(headers);
-        ResponseEntity<Void> response = restTemplate.postForEntity(TEAM_BASE_URL+"/clear", request, Void.class);
-
-        if (response.getStatusCode() != HttpStatus.OK) {
-            throw new HttpServerErrorException(response.getStatusCode());
+    public TeamModel blockScore(String token, Double rate, Long teamNumber) throws IllegalAccessException {
+        if(isGameStarted) {
+            AdminModel leading = repositoryComponent.getAdminByToken(token);
+            TeamModel teamModel = repositoryComponent.getTeamByNumber(teamNumber);
+            if (rate > leading.getMaxScore()) {
+                rate = leading.getMaxScore();
+            }
+            teamModel.setScore(teamModel.getScore() - rate);
+            blockScoreRepository.save(new BlockScoreModel(teamModel.getId(), rate));
+            return teamsRepository.save(teamModel);
         }
+        throw new IllegalAccessException("The game has not started yet");
 
-        response = restTemplate.postForEntity(SHARES_BASE_URL+"/clear", request, Void.class);
 
-        if (response.getStatusCode() != HttpStatus.OK) {
-            throw new HttpServerErrorException(response.getStatusCode());
+    }
+
+    public void clearAll(String token) throws IllegalAccessException {
+        if(!isGameStarted) {
+            repositoryComponent.clearAll();
+
+            RestTemplate restTemplate = new RestTemplate();
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Authorization", token);
+
+
+            HttpEntity<Void> request = new HttpEntity<>(headers);
+            ResponseEntity<Void> response = restTemplate.postForEntity(TEAM_BASE_URL + "/clear", request, Void.class);
+
+            if (response.getStatusCode() != HttpStatus.OK) {
+                throw new HttpServerErrorException(response.getStatusCode());
+            }
+
+            response = restTemplate.postForEntity(SHARES_BASE_URL + "/clear", request, Void.class);
+
+            if (response.getStatusCode() != HttpStatus.OK) {
+                throw new HttpServerErrorException(response.getStatusCode());
+            }
+
+            response = restTemplate.postForEntity(PROBLEMS_BASE_URL + "/clear", request, Void.class);
+
+            if (response.getStatusCode() != HttpStatus.OK) {
+                throw new HttpServerErrorException(response.getStatusCode());
+            }
+            throw new IllegalAccessException("The game has not started yet");
         }
     }
 }

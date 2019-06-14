@@ -1,6 +1,8 @@
 package com.github.reubuisnessgame.gamebank.adminservice.form;
 
 public class AddScoreForm {
+
+
     private Double rate;
 
     private Long teamNumber;

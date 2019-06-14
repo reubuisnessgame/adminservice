@@ -12,11 +12,15 @@ import com.github.reubuisnessgame.gamebank.adminservice.security.jwt.JwtTokenPro
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 import javassist.NotFoundException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 @Component
 public class RepositoryComponent {
+
+    private final PasswordEncoder passwordEncoder;
 
     private final UserRepository userRepository;
 
@@ -29,11 +33,12 @@ public class RepositoryComponent {
 
 
     public RepositoryComponent(UserRepository userRepository, AdminRepository adminRepository,
-                               TeamsRepository teamsRepository, JwtTokenProvider jwtTokenProvider) {
+                               TeamsRepository teamsRepository, JwtTokenProvider jwtTokenProvider, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.adminRepository = adminRepository;
         this.teamsRepository = teamsRepository;
         this.jwtTokenProvider = jwtTokenProvider;
+        this.passwordEncoder = passwordEncoder;
     }
 
     Iterable<AdminModel> getAllAdmins() throws NotFoundException {
@@ -76,7 +81,7 @@ public class RepositoryComponent {
         username = username.trim();
         password = password.trim();
         role = role.trim().toUpperCase();
-        UserModel userModel = new UserModel(username, password, role);
+        UserModel userModel = new UserModel(username, passwordEncoder.encode(password), role);
         if (userModel.getRole().equals(Role.TEAM)) {
             throw new IllegalArgumentException("Incorrect role in creating new admin");
         }
@@ -109,7 +114,7 @@ public class RepositoryComponent {
         }
         if (newPassword != null && !newPassword.trim().isEmpty()) {
             newPassword = newPassword.trim();
-            userModel.setPassword(newPassword);
+            userModel.setPassword(passwordEncoder.encode(newPassword));
         }
         if (newRole != null && !newRole.trim().isEmpty()) {
             newRole = newRole.trim().toUpperCase();
@@ -147,14 +152,11 @@ public class RepositoryComponent {
 
     }
 
-    public
-
-
     void clearAll() {
         userRepository.deleteAll();
         adminRepository.deleteAll();
         teamsRepository.deleteAll();
-        saveNewAdmin("admin", "admin", "MODERATOR", 0D, 0D);
+        saveNewAdmin("admin", passwordEncoder.encode("admin"), "MODERATOR", 0D, 0D);
     }
 
 
