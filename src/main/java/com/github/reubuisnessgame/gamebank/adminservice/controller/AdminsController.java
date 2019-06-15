@@ -50,7 +50,7 @@ public class AdminsController {
     }
 
     @PreAuthorize("hasAuthority('MODERATOR') or hasAuthority('LEADING') or hasAuthority('EXCHANGE_WORKER')")
-    @RequestMapping(value = "/me", method = RequestMethod.POST)
+    @RequestMapping(value = "/me", method = RequestMethod.GET)
     public @ResponseBody
     ResponseEntity aboutMe(@RequestHeader(value = "Authorization") String token) {
         try {
