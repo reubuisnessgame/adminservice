@@ -53,7 +53,7 @@ public class UserModel implements UserDetails {
             default:
                 this.role = Role.TEAM;
         }
-        nonLocked = false;
+        nonLocked = true;
     }
 
     public Long getId() {

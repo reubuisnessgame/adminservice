@@ -1,5 +1,8 @@
 package com.github.reubuisnessgame.gamebank.adminservice.form;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public class ChangeAdminForm {
 
     private String lastUsername;
@@ -14,7 +17,10 @@ public class ChangeAdminForm {
 
     private double newCoefficient;
 
-    public ChangeAdminForm(String lastUsername, String newUsername, String newPassword, String newRole, double newMaxScore, double newCoefficient) {
+    @JsonCreator
+    public ChangeAdminForm(@JsonProperty("lastUsername") String lastUsername,@JsonProperty("newUsername") String newUsername,
+                           @JsonProperty("newPassword") String newPassword, @JsonProperty("newRole") String newRole,
+                           @JsonProperty("newMaxScore") double newMaxScore, @JsonProperty("newCoefficient") double newCoefficient) {
         this.lastUsername = lastUsername;
         this.newUsername = newUsername;
         this.newPassword = newPassword;

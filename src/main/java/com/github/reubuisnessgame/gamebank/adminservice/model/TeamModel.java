@@ -7,8 +7,12 @@ import javax.persistence.*;
 public class TeamModel {
 
     @Id
+    @GeneratedValue
     @Column(name = "team_id")
     private Long id;
+
+    @Column(name = "user_id")
+    private long userId;
 
     @Column(name = "username", nullable = false)
     private String username;
@@ -39,27 +43,27 @@ public class TeamModel {
     }
 
     public TeamModel(Long id, String username, Long teamNumber) {
-        this.id = id;
+        this.userId = id;
         this.username = username;
         this.teamNumber = teamNumber;
-        this.score = null;
-        this.fullScore = null;
-        this.credit = null;
-        this.deposit = null;
-        this.creditTime = null;
-        this.depositTime = null;
+        this.score = 1100D;
+        this.fullScore = 1100D;
+        this.credit = 0D;
+        this.deposit = 0D;
+        this.creditTime = 0L;
+        this.depositTime = 0L;
     }
 
     public TeamModel(Long id, Long teamNumber) {
-        this.id = id;
+        this.userId = id;
         this.teamNumber = teamNumber;
         this.username = teamNumber.toString();
-        this.score = null;
-        this.fullScore = null;
-        this.credit = null;
-        this.deposit = null;
-        this.creditTime = null;
-        this.depositTime = null;
+        this.score = 1100D;
+        this.fullScore = 1100D;
+        this.credit = 0D;
+        this.deposit = 0D;
+        this.creditTime = 0L;
+        this.depositTime = 0L;
     }
 
     public Long getId() {
@@ -68,6 +72,14 @@ public class TeamModel {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public long getUserId() {
+        return userId;
+    }
+
+    public void setUserId(long userId) {
+        this.userId = userId;
     }
 
     public String getUsername() {

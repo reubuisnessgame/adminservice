@@ -10,6 +10,8 @@ import com.github.reubuisnessgame.gamebank.adminservice.repository.BlockScoreRep
 import com.github.reubuisnessgame.gamebank.adminservice.repository.TeamsRepository;
 import com.github.reubuisnessgame.gamebank.adminservice.repository.UserRepository;
 import javassist.NotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -31,12 +33,14 @@ public class AdminsDAO {
 
     private final TeamsRepository teamsRepository;
 
-    private static final String TEAM_BASE_URL = "127.0.0.1:9993/" + "team" ;
-    private static final String SHARES_BASE_URL  = "127.0.0.1:9994/" + "stock";
-    private static final String PROBLEMS_BASE_URL  = "127.0.0.1:9995/" + "problems";
+    private static final String TEAM_BASE_URL = "http://127.0.0.1:9993/" + "team" ;
+    private static final String SHARES_BASE_URL  = "http://127.0.0.1:9994/" + "stock";
+    private static final String PROBLEMS_BASE_URL  = "http://127.0.0.1:9995/" + "problems";
 
     private final BlockScoreRepository blockScoreRepository;
     private boolean isGameStarted;
+
+    private Logger LOGGER = LoggerFactory.getLogger(AdminsDAO.class.getSimpleName());
 
 
     public AdminsDAO(RepositoryComponent repositoryComponent, TeamsRepository teamsRepository, UserRepository userRepository, BlockScoreRepository blockScoreRepository) {
@@ -58,6 +62,9 @@ public class AdminsDAO {
 
     public void startGame(String token, boolean isGameStarted) {
         this.isGameStarted = isGameStarted;
+
+        LOGGER.info("Game Started");
+
         RestTemplate restTemplate = new RestTemplate();
 
         HttpHeaders headers = new HttpHeaders();
@@ -67,22 +74,37 @@ public class AdminsDAO {
 
         HttpEntity<StartGameForm> request = new HttpEntity<>(form, headers);
 
-        ResponseEntity<Void> response = restTemplate.postForEntity(TEAM_BASE_URL+"/game", request, Void.class);
+        ResponseEntity<Void> response;
 
-        if (response.getStatusCode() != HttpStatus.OK) {
-            throw new HttpServerErrorException(response.getStatusCode());
+        try {
+            response = restTemplate.postForEntity(TEAM_BASE_URL+"/game", request, Void.class);
+
+            if (response.getStatusCode() != HttpStatus.OK) {
+                throw new HttpServerErrorException(response.getStatusCode());
+            }
+        } catch (Exception e){
+            LOGGER.warn("Teams service not available", e);
+
         }
 
-        response = restTemplate.postForEntity(SHARES_BASE_URL+"/game", request, Void.class);
+        try {
+            response = restTemplate.postForEntity(SHARES_BASE_URL + "/game", request, Void.class);
 
-        if (response.getStatusCode() != HttpStatus.OK) {
-            throw new HttpServerErrorException(response.getStatusCode());
+            if (response.getStatusCode() != HttpStatus.OK) {
+                throw new HttpServerErrorException(response.getStatusCode());
+            }
+        } catch (Exception e){
+            LOGGER.warn("StockExchange service not available", e);
         }
 
-        response = restTemplate.postForEntity(PROBLEMS_BASE_URL+"/game", request, Void.class);
+        try {
+            response = restTemplate.postForEntity(PROBLEMS_BASE_URL + "/game", request, Void.class);
 
-        if (response.getStatusCode() != HttpStatus.OK) {
-            throw new HttpServerErrorException(response.getStatusCode());
+            if (response.getStatusCode() != HttpStatus.OK) {
+                throw new HttpServerErrorException(response.getStatusCode());
+            }
+        } catch (Exception e){
+            LOGGER.warn("Problems service not available", e);
         }
 
     }
@@ -125,7 +147,7 @@ public class AdminsDAO {
 
             AdminModel leading = repositoryComponent.getAdminByToken(token);
             TeamModel teamModel = repositoryComponent.getTeamByNumber(teamNumber);
-            BlockScoreModel model = blockScoreRepository.findByTeamId(teamModel.getId()).orElseThrow(() -> new IllegalArgumentException("Incorrect team data"));
+            BlockScoreModel model = blockScoreRepository.findByTeamId(teamModel.getUserId()).orElseThrow(() -> new IllegalArgumentException("Incorrect team data"));
             double rate = model.getRate();
             if (isWin) {
                 rate *= leading.getCoefficient();
@@ -145,7 +167,7 @@ public class AdminsDAO {
                 rate = leading.getMaxScore();
             }
             teamModel.setScore(teamModel.getScore() - rate);
-            blockScoreRepository.save(new BlockScoreModel(teamModel.getId(), rate));
+            blockScoreRepository.save(new BlockScoreModel(teamModel.getUserId(), rate));
             return teamsRepository.save(teamModel);
         }
         throw new IllegalAccessException("The game has not started yet");
@@ -164,22 +186,37 @@ public class AdminsDAO {
 
 
             HttpEntity<Void> request = new HttpEntity<>(headers);
-            ResponseEntity<Void> response = restTemplate.postForEntity(TEAM_BASE_URL + "/clear", request, Void.class);
+            ResponseEntity<Void> response;
 
-            if (response.getStatusCode() != HttpStatus.OK) {
-                throw new HttpServerErrorException(response.getStatusCode());
+            /*try {
+                response = restTemplate.postForEntity(TEAM_BASE_URL + "/clear", request, Void.class);
+
+                if (response.getStatusCode() != HttpStatus.OK) {
+                    throw new HttpServerErrorException(response.getStatusCode());
+                }
+            } catch (Exception ignore) {
+                LOGGER.warn("Teams service not available");
+            }*/
+
+            try {
+                response = restTemplate.postForEntity(SHARES_BASE_URL + "/clear", request, Void.class);
+
+                if (response.getStatusCode() != HttpStatus.OK) {
+                    throw new HttpServerErrorException(response.getStatusCode());
+                }
+            } catch (Exception e) {
+                LOGGER.warn("StockExchange service not available", e);
             }
 
-            response = restTemplate.postForEntity(SHARES_BASE_URL + "/clear", request, Void.class);
+            try {
+                response = restTemplate.postForEntity(PROBLEMS_BASE_URL + "/clear", request, Void.class);
 
-            if (response.getStatusCode() != HttpStatus.OK) {
-                throw new HttpServerErrorException(response.getStatusCode());
-            }
+                if (response.getStatusCode() != HttpStatus.OK) {
+                    throw new HttpServerErrorException(response.getStatusCode());
+                }
 
-            response = restTemplate.postForEntity(PROBLEMS_BASE_URL + "/clear", request, Void.class);
-
-            if (response.getStatusCode() != HttpStatus.OK) {
-                throw new HttpServerErrorException(response.getStatusCode());
+            } catch (Exception e){
+                LOGGER.warn("Problems service not available", e);
             }
             throw new IllegalAccessException("The game has not started yet");
         }

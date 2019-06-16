@@ -7,8 +7,12 @@ import javax.persistence.*;
 public class AdminModel {
 
     @Id
+    @GeneratedValue
     @Column(name = "admin_id")
     private Long id;
+
+    @Column(name = "user_id")
+    private long userId;
 
     @Column(name = "username", nullable = false)
     private String username;
@@ -26,8 +30,8 @@ public class AdminModel {
     public AdminModel() {
     }
 
-    public AdminModel(Long id, String username, Role role, Double maxScore, Double coefficient) {
-        this.id = id;
+    public AdminModel(long userId, String username, Role role, Double maxScore, Double coefficient) {
+        this.userId = userId;
         this.username = username;
         this.role = role;
         this.maxScore = maxScore;
@@ -40,6 +44,14 @@ public class AdminModel {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public long getUserId() {
+        return userId;
+    }
+
+    public void setUserId(long userId) {
+        this.userId = userId;
     }
 
     public String getUsername() {

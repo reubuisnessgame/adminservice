@@ -51,20 +51,20 @@ public class RepositoryComponent {
 
     AdminModel getAdminByToken(String token) {
         Long userId = getUserIdFromToken(token);
-        return adminRepository.findById(userId).orElseThrow(() ->
+        return adminRepository.findByUserId(userId).orElseThrow(() ->
                 new UsernameNotFoundException("Admin ID: " + userId + " not found"));
     }
 
     TeamModel getTeamByToken(String token) {
         Long userId = getUserIdFromToken(token);
-        return teamsRepository.findById(userId).orElseThrow(() ->
+        return teamsRepository.findByUserId(userId).orElseThrow(() ->
                 new UsernameNotFoundException("Team ID: " + userId + " not found"));
     }
 
 
     private Long getUserIdFromToken(String token) {
         Jws<Claims> claims = jwtTokenProvider.getClaims(resolveToken(token));
-        return (Long) claims.getBody().get("userId");
+        return Long.valueOf((Integer) claims.getBody().get("userId"));
     }
 
 
@@ -95,7 +95,7 @@ public class RepositoryComponent {
             throw new IllegalArgumentException("Incorrect data in creating new team");
 
         }
-        UserModel userModel = new UserModel(number.toString(), null, "TEAM");
+        UserModel userModel = new UserModel(number.toString(), passwordEncoder.encode("team"), "TEAM");
         userRepository.save(userModel);
         TeamModel teamModel = new TeamModel(userModel.getId(), number);
         return teamsRepository.save(teamModel);
