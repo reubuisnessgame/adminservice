@@ -12,6 +12,7 @@ import com.github.reubuisnessgame.gamebank.adminservice.repository.UserRepositor
 import javassist.NotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -21,6 +22,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestTemplate;
 
+import javax.transaction.Transactional;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -33,9 +35,9 @@ public class AdminsDAO {
 
     private final TeamsRepository teamsRepository;
 
-    private static final String TEAM_BASE_URL = "http://127.0.0.1:9993/" + "team" ;
-    private static final String SHARES_BASE_URL  = "http://127.0.0.1:9994/" + "stock";
-    private static final String PROBLEMS_BASE_URL  = "http://127.0.0.1:9995/" + "problems";
+    private static final String TEAM_BASE_URL = "http://80.93.182.56:9993/" + "team";
+    private static final String SHARES_BASE_URL = "http://77.244.213.118:9994/" + "stock";
+    private static final String PROBLEMS_BASE_URL = "http://80.93.182.56:9995/" + "problems";
 
     private final BlockScoreRepository blockScoreRepository;
     private boolean isGameStarted;
@@ -53,11 +55,19 @@ public class AdminsDAO {
 
 
     public AdminModel createNewAdmin(String username, String password, String userRole, Double maxScore, Double coefficient) {
-        return repositoryComponent.saveNewAdmin(username, password, userRole, maxScore, coefficient);
+        try {
+            return repositoryComponent.saveNewAdmin(username, password, userRole, maxScore, coefficient);
+        } catch (DataIntegrityViolationException e) {
+            throw new IllegalArgumentException("User with username " + username + "is already exist");
+        }
     }
 
     public ChangingUserDataForm changeAdmin(String username, String newUsername, String newPassword, String newRole, Double newMaxScore, Double newCoefficient) {
-        return repositoryComponent.changeAdminData(username, newUsername, newPassword, newRole, newMaxScore, newCoefficient);
+        try {
+            return repositoryComponent.changeAdminData(username, newUsername, newPassword, newRole, newMaxScore, newCoefficient);
+        } catch (DataIntegrityViolationException e) {
+            throw new IllegalArgumentException("User with username " + username + "is already exist");
+        }
     }
 
     public void startGame(String token, boolean isGameStarted) {
@@ -77,13 +87,13 @@ public class AdminsDAO {
         ResponseEntity<Void> response;
 
         try {
-            response = restTemplate.postForEntity(TEAM_BASE_URL+"/game", request, Void.class);
+            response = restTemplate.postForEntity(TEAM_BASE_URL + "/game", request, Void.class);
 
             if (response.getStatusCode() != HttpStatus.OK) {
                 throw new HttpServerErrorException(response.getStatusCode());
             }
-        } catch (Exception e){
-            LOGGER.warn("Teams service not available", e);
+        } catch (Exception e) {
+            LOGGER.warn("Teams service not available\n" + e.getMessage());
 
         }
 
@@ -93,8 +103,8 @@ public class AdminsDAO {
             if (response.getStatusCode() != HttpStatus.OK) {
                 throw new HttpServerErrorException(response.getStatusCode());
             }
-        } catch (Exception e){
-            LOGGER.warn("StockExchange service not available", e);
+        } catch (Exception e) {
+            LOGGER.warn("StockExchange service not available\n" + e.getMessage());
         }
 
         try {
@@ -103,14 +113,18 @@ public class AdminsDAO {
             if (response.getStatusCode() != HttpStatus.OK) {
                 throw new HttpServerErrorException(response.getStatusCode());
             }
-        } catch (Exception e){
-            LOGGER.warn("Problems service not available", e);
+        } catch (Exception e) {
+            LOGGER.warn("Problems service not available\n" + e.getMessage());
         }
 
     }
 
     public TeamModel createNewTeam(Long number) {
-        return repositoryComponent.saveNewTeam(number);
+        try {
+            return repositoryComponent.saveNewTeam(number);
+        } catch (DataIntegrityViolationException e) {
+            throw new IllegalArgumentException("User with username " + number + "is already exist");
+        }
     }
 
 
@@ -128,22 +142,25 @@ public class AdminsDAO {
     public Iterable<TeamModel> getAllTeams() throws NotFoundException {
         Iterable<TeamModel> userModels = teamsRepository.findAll();
         List<TeamModel> teamModels = new ArrayList<>();
+        if (!userModels.iterator().hasNext()) {
+            throw new NotFoundException("Teams not found");
+        }
 
         userModels.forEach(teamModels::add);
-        teamModels.sort((t, t1) -> (int) (t.getFullScore() - t1.getFullScore()));
-        throw new NotFoundException("Teams not found");
+        teamModels.sort((t1, t2) -> (int) (t2.getFullScore() - t1.getFullScore()));
+        return teamModels;
     }
 
     public Iterable<AdminModel> getAllAdmins() throws NotFoundException {
         return repositoryComponent.getAllAdmins();
     }
 
-    public AdminModel getMyInfo(String token){
+    public AdminModel getMyInfo(String token) {
         return repositoryComponent.getAdminByToken(token);
     }
 
     public TeamModel addScore(String token, Long teamNumber, boolean isWin) throws IllegalAccessException {
-        if(isGameStarted) {
+        if (isGameStarted) {
 
             AdminModel leading = repositoryComponent.getAdminByToken(token);
             TeamModel teamModel = repositoryComponent.getTeamByNumber(teamNumber);
@@ -151,23 +168,53 @@ public class AdminsDAO {
             double rate = model.getRate();
             if (isWin) {
                 rate *= leading.getCoefficient();
-                teamModel.setScore(teamModel.getScore() + rate);
+                LOGGER.info("New win rate " + rate + " " + leading.getCoefficient());
+                double score = teamModel.getScore() + rate;
+                teamModel.setScore(score);
+                teamModel.setFullScore(score);
+                teamModel = teamsRepository.save(teamModel);
             }
-            return teamsRepository.save(teamModel);
+            blockScoreRepository.delete(model);
+            return teamModel;
         }
         throw new IllegalAccessException("The game has not started yet");
 
     }
 
+    @Transactional
     public TeamModel blockScore(String token, Double rate, Long teamNumber) throws IllegalAccessException {
-        if(isGameStarted) {
+        if (isGameStarted) {
+            LOGGER.info("blocking score " + rate);
             AdminModel leading = repositoryComponent.getAdminByToken(token);
+            LOGGER.info("2 ");
+
             TeamModel teamModel = repositoryComponent.getTeamByNumber(teamNumber);
+            LOGGER.info("3");
+
             if (rate > leading.getMaxScore()) {
                 rate = leading.getMaxScore();
             }
-            teamModel.setScore(teamModel.getScore() - rate);
-            blockScoreRepository.save(new BlockScoreModel(teamModel.getUserId(), rate));
+            LOGGER.info("4");
+
+            double score = teamModel.getScore() - rate;
+            teamModel.setScore(score);
+            teamModel.setFullScore(score);
+            try {
+                LOGGER.info("5");
+
+                blockScoreRepository.deleteAllByTeamId(teamModel.getUserId());
+
+                LOGGER.info("6");
+
+                blockScoreRepository.save(new BlockScoreModel(teamModel.getUserId(), rate));
+                LOGGER.info("7");
+            } catch (Throwable e){
+                LOGGER.warn("!!ALARM!!");
+                LOGGER.info(e.getMessage());
+                LOGGER.info("Exception");
+            }
+
+            LOGGER.info("8");
             return teamsRepository.save(teamModel);
         }
         throw new IllegalAccessException("The game has not started yet");
@@ -176,7 +223,7 @@ public class AdminsDAO {
     }
 
     public void clearAll(String token) throws IllegalAccessException {
-        if(!isGameStarted) {
+        if (!isGameStarted) {
             repositoryComponent.clearAll();
 
             RestTemplate restTemplate = new RestTemplate();
@@ -205,7 +252,7 @@ public class AdminsDAO {
                     throw new HttpServerErrorException(response.getStatusCode());
                 }
             } catch (Exception e) {
-                LOGGER.warn("StockExchange service not available", e);
+                LOGGER.warn("StockExchange service not available\n" + e.getMessage());
             }
 
             try {
@@ -215,10 +262,11 @@ public class AdminsDAO {
                     throw new HttpServerErrorException(response.getStatusCode());
                 }
 
-            } catch (Exception e){
-                LOGGER.warn("Problems service not available", e);
+            } catch (Exception e) {
+                LOGGER.warn("Problems service not available\n" + e.getMessage());
             }
-            throw new IllegalAccessException("The game has not started yet");
+            return;
         }
+        throw new IllegalAccessException("The game has not started yet");
     }
 }

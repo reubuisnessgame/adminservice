@@ -12,7 +12,6 @@ import com.github.reubuisnessgame.gamebank.adminservice.security.jwt.JwtTokenPro
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 import javassist.NotFoundException;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -144,19 +143,19 @@ public class RepositoryComponent {
         }
         ChangingUserDataForm userDataForm = new ChangingUserDataForm();
         userDataForm.setUser(adminModel);
-        userDataForm.setToken(jwtTokenProvider.createToken(userModel.getUsername(), userModel.getRole().name()));
         userRepository.save(userModel);
+        userDataForm.setToken(jwtTokenProvider.createToken(userModel.getUsername(), userModel.getRole().name()));
         adminRepository.save(adminModel);
         return userDataForm;
 
 
     }
 
-    void clearAll() {
+    public void clearAll() {
         userRepository.deleteAll();
         adminRepository.deleteAll();
         teamsRepository.deleteAll();
-        saveNewAdmin("admin", passwordEncoder.encode("admin"), "MODERATOR", 0D, 0D);
+        saveNewAdmin("admin", "admin", "MODERATOR", 0D, 0D);
     }
 
 

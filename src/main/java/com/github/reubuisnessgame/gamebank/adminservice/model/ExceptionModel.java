@@ -3,7 +3,7 @@ package com.github.reubuisnessgame.gamebank.adminservice.model;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
-public class ExceptionModel {
+public class ExceptionModel extends Throwable {
     private String timestamp;
     private int status;
     private String error;

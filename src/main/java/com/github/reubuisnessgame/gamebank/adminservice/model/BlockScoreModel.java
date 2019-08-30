@@ -17,6 +17,9 @@ public class BlockScoreModel {
     @Column(name = "rate", nullable = false)
     private double rate;
 
+    public BlockScoreModel() {
+    }
+
     public BlockScoreModel(long teamId, double rate) {
         this.teamId = teamId;
         this.rate = rate;

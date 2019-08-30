@@ -3,18 +3,28 @@ package com.github.reubuisnessgame.gamebank.adminservice.controller;
 import com.github.reubuisnessgame.gamebank.adminservice.dao.AdminsDAO;
 import com.github.reubuisnessgame.gamebank.adminservice.form.*;
 import com.github.reubuisnessgame.gamebank.adminservice.model.ExceptionModel;
+import com.github.reubuisnessgame.gamebank.adminservice.model.UserModel;
 import javassist.NotFoundException;
+import org.hibernate.exception.ConstraintViolationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
+import java.util.Map;
+
 @Controller
 @RequestMapping(value = "/admin")
 public class AdminsController {
 
     private final AdminsDAO adminsDAO;
+
+    private Logger LOGGER = LoggerFactory.getLogger(AdminsController.class.getSimpleName());
 
 
     public AdminsController(AdminsDAO adminsDAO) {
@@ -68,8 +78,12 @@ public class AdminsController {
     public @ResponseBody
     ResponseEntity startGame(@RequestHeader(value = "Authorization") String token, @RequestParam boolean start) {
         try {
+            LOGGER.info("Start or stop game");
             adminsDAO.startGame(token, start);
-            return ResponseEntity.ok().build();
+            Map<String, Object> map = new HashMap<>();
+            map.put("status", "ok");
+            map.put("isGameStated", start);
+            return ResponseEntity.ok(map);
         } catch (Throwable t) {
             return ResponseEntity.status(500).body(new ExceptionModel(500, "Internal Error", t.getMessage(), "/admin/start"));
         }
@@ -84,7 +98,7 @@ public class AdminsController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(new ExceptionModel(400, "Bad Request", e.getMessage(), "/admin/create_team/" + number));
         } catch (Throwable t) {
-            return ResponseEntity.status(500).body(new ExceptionModel(500, "Internal Error", t.getMessage(), "/admin/create_team/" + number));
+            return ResponseEntity.status(500).body(new ExceptionModel(500, "Internal Error", t.getMessage() + " Type: " + t.getClass().getSimpleName(), "/admin/create_team/" + number));
         }
     }
 
@@ -133,9 +147,14 @@ public class AdminsController {
     @PreAuthorize("hasAuthority('MODERATOR')")
     @RequestMapping(value = "/lock/{username}", method = RequestMethod.POST)
     public @ResponseBody
-    ResponseEntity lockUser(@PathVariable(value = "username") String username, @PathVariable boolean lock) {
+    ResponseEntity lockUser(@PathVariable(value = "username") String username, @RequestParam boolean lock) {
         try {
-            return ResponseEntity.ok(adminsDAO.lockUnlockUserByUsername(username, lock));
+            UserModel model = adminsDAO.lockUnlockUserByUsername(username, lock);
+            Map <String,Object> map = new HashMap<>();
+            map.put("username", model.getUsername());
+            map.put("role", model.getRole());
+            map.put("non_locked", model.isAccountNonLocked());
+            return ResponseEntity.ok(map);
         } catch (UsernameNotFoundException e) {
             return ResponseEntity.status(404).body(new ExceptionModel(404, "Not Found", e.getMessage(), "/admin/lock/" + username));
         } catch (Throwable t) {
@@ -146,30 +165,31 @@ public class AdminsController {
     @PreAuthorize("hasAuthority('MODERATOR') or hasAuthority('LEADING')")
     @RequestMapping(value = "/block_scr", method = RequestMethod.POST)
     public @ResponseBody
-    ResponseEntity blockScore(@RequestHeader(value = "Authorization") String token, AddScoreForm form) {
+    ResponseEntity blockScore(@RequestHeader(value = "Authorization") String token, @RequestBody AddScoreForm form) {
         try {
+            LOGGER.info("Blocking score " + form.getTeamNumber());
             return ResponseEntity.ok(adminsDAO.blockScore(token, form.getRate(), form.getTeamNumber()));
-        } catch (IllegalAccessException e) {
-            return ResponseEntity.status(403).body(new ExceptionModel(403, "Forbidden", e.getMessage(), "/team/rpl_credit"));
+        } catch (DataIntegrityViolationException e) {
+            return ResponseEntity.status(400).body(new ExceptionModel(400, "Bad Request", e.getMessage(), "/team/block_scr"));
         } catch (UsernameNotFoundException e) {
-            return ResponseEntity.status(404).body(new ExceptionModel(404, "Not Found", e.getMessage(), "/admin/add_scr"));
+            return ResponseEntity.status(404).body(new ExceptionModel(404, "Not Found", e.getMessage(), "/admin/block_scr"));
         } catch (Throwable t) {
-            return ResponseEntity.status(500).body(new ExceptionModel(500, "Internal Error", t.getMessage(), "/admin/add_scr"));
+            return ResponseEntity.status(500).body(new ExceptionModel(500, "Internal Error", t.getMessage(), "/admin/block_scr"));
         }
     }
 
     @PreAuthorize("hasAuthority('MODERATOR') or hasAuthority('LEADING')")
     @RequestMapping(value = "/add_scr", method = RequestMethod.POST)
     public @ResponseBody
-    ResponseEntity addScore(@RequestHeader(value = "Authorization") String token, AddScoreForm form) {
+    ResponseEntity addScore(@RequestHeader(value = "Authorization") String token, @RequestBody AddScoreForm form) {
         try {
             return ResponseEntity.ok(adminsDAO.addScore(token, form.getTeamNumber(), form.isWin()));
         } catch (IllegalAccessException e) {
-            return ResponseEntity.status(403).body(new ExceptionModel(403, "Forbidden", e.getMessage(), "/team/rpl_credit"));
+            return ResponseEntity.status(403).body(new ExceptionModel(403, "Forbidden", e.getMessage(), "/team/add_scr"));
         } catch (UsernameNotFoundException e) {
             return ResponseEntity.status(404).body(new ExceptionModel(404, "Not Found", e.getMessage(), "/admin/add_scr"));
         } catch (Throwable t) {
-            return ResponseEntity.status(500).body(new ExceptionModel(500, "Internal Error", t.getMessage(), "/admin/add_scr"));
+            return ResponseEntity.status(500).body(new ExceptionModel(500, "Internal Error", t.getClass().getSimpleName(), "/admin/add_scr"));
         }
     }
 
@@ -179,9 +199,11 @@ public class AdminsController {
     ResponseEntity clearAll(@RequestHeader(value = "Authorization") String token) {
         try {
             adminsDAO.clearAll(token);
-            return ResponseEntity.ok().build();
+            Map<String, Object> map = new HashMap<>();
+            map.put("status", "ok");
+            return ResponseEntity.ok(map);
         } catch (IllegalAccessException e) {
-            return ResponseEntity.status(403).body(new ExceptionModel(403, "Forbidden", e.getMessage(), "/team/rpl_credit"));
+            return ResponseEntity.status(403).body(new ExceptionModel(403, "Forbidden", e.getMessage(), "/admin/clear"));
         } catch (Throwable t) {
             return ResponseEntity.status(500).body(new ExceptionModel(500, "Internal Error", t.getMessage(), "/admin/clear"));
         }

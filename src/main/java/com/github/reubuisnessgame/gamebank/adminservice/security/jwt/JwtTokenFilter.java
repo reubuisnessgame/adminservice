@@ -16,10 +16,12 @@ import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import java.io.IOException;
+import java.io.PrintWriter;
 
 public class JwtTokenFilter extends GenericFilterBean {
 
     private JwtTokenProvider jwtTokenProvider;
+    private PrintWriter writer;
 
     JwtTokenFilter(JwtTokenProvider jwtTokenProvider) {
         this.jwtTokenProvider = jwtTokenProvider;
@@ -32,18 +34,25 @@ public class JwtTokenFilter extends GenericFilterBean {
         String token = jwtTokenProvider.resolveToken((HttpServletRequest) req);
         try {
             if (token != null && jwtTokenProvider.validateToken(token)) {
-                Authentication auth = jwtTokenProvider.getAuthentication(token);
+                Authentication auth = null;
+                try {
+                    auth = jwtTokenProvider.getAuthentication(token);
+                } catch (IllegalAccessException ignore) {
+                }
 
                 if (auth != null) {
                     SecurityContextHolder.getContext().setAuthentication(auth);
                 }
             }
-        }catch (InvalidJwtAuthenticationException e){
+        } catch (InvalidJwtAuthenticationException e) {
+
             ExceptionModel ex = new ExceptionModel(403, "Forbidden",
                     e.getMessage(), ((HttpServletRequest) req).getRequestURI());
             Gson gson = new Gson();
             String json = gson.toJson(ex);
-            res.getWriter().append(json);
+            if(writer == null) {
+                writer = res.getWriter().append(json);
+            }
         }
         filterChain.doFilter(req, res);
     }

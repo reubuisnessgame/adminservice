@@ -10,7 +10,7 @@ import java.util.Collections;
 
 
 @Entity
-@Table(name = "userss")
+@Table(name = "users")
 public class UserModel implements UserDetails {
 
     @Id
@@ -18,7 +18,7 @@ public class UserModel implements UserDetails {
     @Column(name = "user_id", unique = true, nullable = false)
     private Long id;
 
-    @Column(name = "username", nullable = false)
+    @Column(name = "username", nullable = false, unique = true)
     private String username;
 
     @Column(name = "role", nullable = false)

@@ -9,11 +9,13 @@ buildscript {
 }
 
 plugins {
+    id 'war'
     id 'java'
 }
 
+
 group 'com.github.reubuisnessgame.gamebank'
-version '0.1-START'
+version '0.9-BETA'
 
 sourceCompatibility = 1.8
 
@@ -39,6 +41,7 @@ dependencies {
     implementation group: 'org.springframework.boot', name: 'spring-boot-starter-data-jpa', version: '2.1.4.RELEASE'
     implementation group: 'org.springframework.boot', name: 'spring-boot-starter-thymeleaf', version: '2.1.4.RELEASE'
     implementation group: 'io.jsonwebtoken', name: 'jjwt', version: '0.9.1'
+//    compile group: 'com.h2database', name: 'h2', version: '1.4.199'
     compile group: 'org.postgresql', name: 'postgresql', version: '42.2.5'
     implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '2.9.8'
     implementation 'com.google.code.gson:gson:2.8.2'

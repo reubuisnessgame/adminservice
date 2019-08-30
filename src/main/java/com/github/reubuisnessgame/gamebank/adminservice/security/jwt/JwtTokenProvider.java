@@ -62,8 +62,11 @@ public class JwtTokenProvider {
                 .compact();
     }
 
-    Authentication getAuthentication(String token) {
+    Authentication getAuthentication(String token) throws IllegalAccessException {
         UserDetails userDetails = this.userDetailsService.loadUserByUsername(getUsername(token));
+        if(!userDetails.isAccountNonLocked()){
+            throw new IllegalAccessException("Account have locked");
+        }
         return new UsernamePasswordAuthenticationToken(userDetails, "", userDetails.getAuthorities());
     }
 
